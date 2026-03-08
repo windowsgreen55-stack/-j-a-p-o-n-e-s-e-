@@ -113,6 +113,17 @@ body{
   border-radius: 4px;
   display: block;
 }
+.rainbow-name {
+  animation: rainbow 3s linear infinite;
+  font-weight: bold;
+}
+@keyframes rainbow {
+  0% { color: #ff0000; }
+  25% { color: #ffff00; }
+  50% { color: #00ff00; }
+  75% { color: #00ffff; }
+  100% { color: #ff0000; }
+}
 </style>
 </head>
 <body>
@@ -240,7 +251,7 @@ db.ref("chattingterminalors/messages")
     let imgHtml = "";
     if (images.length > 0) {
       images.forEach(url => {
-        imgHtml += `<img src="${url}" class="chat-image" alt="Imagem" onerror="this.style.display='none'; this.nextSibling.style.display='block';">`;
+        imgHtml += `<img src="${url}" class="chat-image" alt="Imagem" onerror="this.style.display='none';">`;
       });
       textContent = textContent.replace(imageRegex, ''); // remove URL do texto
     }
@@ -251,7 +262,7 @@ db.ref("chattingterminalors/messages")
     output.scrollTop = output.scrollHeight;
   });
 
-// Input com comandos (incluindo /name corrigido)
+// Input com comandos (incluindo /name e /color corrigidos)
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
@@ -299,7 +310,47 @@ input.addEventListener("keydown", e => {
       }
     }
 
-    // Comando /name (corrigido e funcional)
+    // Comando /color (corrigido)
+    if (val.startsWith("/color ")) {
+      const newColor = val.slice(7).trim();
+      if (!newColor) {
+        botMsg("Cor inválida.");
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (newColor.toLowerCase() === "rainbow") {
+        color = "rainbow";
+        localStorage.setItem("ct_color", color);
+        userRef.update({ color: "rainbow" }).then(() => {
+          botMsg("Sua cor foi mudada para rainbow!");
+        }).catch(err => {
+          botMsg("Erro ao mudar cor (permissão negada?).");
+          console.error(err);
+        });
+      } else {
+        // Valida hex simples (#rrggbb ou #rgb)
+        const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+        if (hexRegex.test(newColor)) {
+          color = newColor;
+          localStorage.setItem("ct_color", color);
+          userRef.update({ color: color }).then(() => {
+            botMsg("Sua cor foi mudada para " + newColor + ".");
+          }).catch(err => {
+            botMsg("Erro ao mudar cor (permissão negada?).");
+            console.error(err);
+          });
+        } else {
+          botMsg("Cor inválida. Use #RRGGBB ou 'rainbow'.");
+        }
+      }
+      input.value = "";
+      e.preventDefault();
+      return;
+    }
+
+    // Comando /name (já corrigido antes)
     if (val.startsWith("/name ")) {
       const newName = val.slice(6).trim();
       if (!newName || newName.includes("/")) {
