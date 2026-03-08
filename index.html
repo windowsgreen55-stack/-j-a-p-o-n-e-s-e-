@@ -149,17 +149,9 @@ const loadingScreen = document.getElementById("loading");
 const usersDiv = document.getElementById("users");
 const terminalDiv = document.getElementById("terminal");
 
-// Sistema de BAN LOCAL (só pra ブライアン)
-const MY_NAME = "ブライアン";
-const STORAGE_KEY = "brian_banned_users";
-let banned = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-
-// Função auxiliar pra mensagens do sistema
-function botMsg(text) {
-  const line = document.createElement("div");
-  line.innerHTML = `<span class="timestamp">[${getTime()}]</span> <span style="color:#ff0000">BrianBan</span>: ${text}`;
-  output.appendChild(line);
-  output.scrollTop = output.scrollHeight;
+// Funções básicas
+function randomColor() {
+  return `hsl(${Math.random()*360},70%,60%)`;
 }
 
 function getTime() {
@@ -167,14 +159,11 @@ function getTime() {
   return "[" + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + "]";
 }
 
-function randomColor() {
-  return `hsl(${Math.random()*360},70%,60%)`;
-}
-
-function escapeHTML(str) {
-  const p = document.createElement("p");
-  p.textContent = str;
-  return p.innerHTML;
+function botMsg(text) {
+  const line = document.createElement("div");
+  line.innerHTML = `<span class="timestamp">[${getTime()}]</span> <span style="color:#00ff00">System32</span>: ${text}`;
+  output.appendChild(line);
+  output.scrollTop = output.scrollHeight;
 }
 
 function hideLoading() {
@@ -212,9 +201,9 @@ db.ref("chattingterminalors/users").on("value", snap => {
   });
 });
 
-// Mensagens normais
+// Mensagens (limite baixo pra carregar rápido)
 db.ref("chattingterminalors/messages")
-  .limitToLast(100)
+  .limitToLast(50)  // só as últimas 50 pra não carregar muito histórico
   .on("child_added", snap => {
     const m = snap.val();
     const line = document.createElement("div");
@@ -224,82 +213,19 @@ db.ref("chattingterminalors/messages")
     output.scrollTop = output.scrollHeight;
   });
 
-// Observer para deletar mensagens de banidos (mais robusto)
-const banObserver = new MutationObserver(mutations => {
-  setTimeout(() => {  // pequeno delay pra garantir que o DOM atualizou
-    mutations.forEach(mutation => {
-      if (mutation.addedNodes) {
-        mutation.addedNodes.forEach(node => {
-          if (node.nodeType === 1 && node.tagName === "DIV") {
-            const text = node.innerText.toLowerCase() || "";
-            for (const bannedUser of banned) {
-              if (text.includes(bannedUser.toLowerCase() + ":")) {
-                node.remove();
-                const banLine = document.createElement("div");
-                banLine.style.cssText = "margin:6px 0; padding:6px 12px; background:rgba(255,0,0,0.2); border-left:5px solid #ff0000; color:#ff4444; font-weight:bold;";
-                banLine.innerHTML = `<span class="timestamp">[${getTime()}]</span> <span style="color:#ff0000">BrianBan</span>: BANIDO! Você não pode falar aqui.`;
-                output.appendChild(banLine);
-                output.scrollTop = output.scrollHeight;
-                break;
-              }
-            }
-          }
-        });
-      }
-    });
-  }, 50);
-});
-banObserver.observe(output, { childList: true, subtree: true });
-
-// Input com comandos de ban (só pra ブライアン)
+// Input
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
 
-    // Só ativa se for ブライアン
-    if (username.trim() === MY_NAME) {
-      if (val.startsWith("/ban ")) {
-        let target = val.slice(5).trim().toLowerCase();
-        if (target && !banned.includes(target)) {
-          banned.push(target);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-          botMsg(`BAN LOCAL: ${target} banido (só você vê)`);
-        } else {
-          botMsg("Já banido ou inválido.");
-        }
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val.startsWith("/unban ")) {
-        let target = val.slice(7).trim().toLowerCase();
-        banned = banned.filter(u => u !== target);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-        botMsg(`UNBAN LOCAL: ${target} liberado`);
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/banlist") {
-        botMsg("BAN LIST (local): " + (banned.length ? banned.join(", ") : "vazio"));
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/unbanall") {
-        banned = [];
-        localStorage.setItem(STORAGE_KEY, "[]");
-        botMsg("Todos bans locais removidos.");
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
+    if (val === "/clear") {
+      output.innerHTML = "チャッティングターミナルズ\n-------------------\nグローバルターミナルチャット\n/help でコマンド一覧\n";
+      input.value = "";
+      e.preventDefault();
+      return;
     }
 
-    // Envio normal de mensagem
+    // Envio normal
     db.ref("chattingterminalors/messages").push({
       name: username,
       color: color,
@@ -309,6 +235,26 @@ input.addEventListener("keydown", e => {
     input.value = "";
   }
 });
+
+// FUNÇÃO PRINCIPAL: LIMPA O CHAT VISUAL TODA VEZ QUE CARREGA A PÁGINA (F5)
+window.addEventListener("load", () => {
+  setTimeout(() => {
+    // Limpa todo o conteúdo do output, mantendo só o texto inicial
+    output.innerHTML = `
+チャッティングターミナルズ
+-------------------
+グローバルターミナルチャット
+/help でコマンド一覧
+    `;
+    botMsg("チャットがリロードされました。過去のメッセージはクリアされました。");
+  }, 1500); // delay pra esperar o loading acabar e os listeners iniciarem
+});
+
+function escapeHTML(str) {
+  const p = document.createElement("p");
+  p.textContent = str;
+  return p.innerHTML;
+}
 </script>
 </body>
 </html>
