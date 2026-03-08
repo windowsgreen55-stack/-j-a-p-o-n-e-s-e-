@@ -104,6 +104,15 @@ body{
   margin-left:5px;
   font-size:10px;
 }
+/* Estilo pra imagens enviadas no chat */
+.chat-image {
+  max-width: 380px;
+  max-height: 300px;
+  margin-top: 8px;
+  border: 2px solid #00ff00;
+  border-radius: 4px;
+  display: block;
+}
 </style>
 </head>
 <body>
@@ -118,8 +127,10 @@ body{
 -------------------
 グローバルターミナルチャット
 /help でコマンド一覧
+
+(画像を送るにはURLを貼ってください。例: https://example.com/imagem.png)
 </div>
-<input id="input" placeholder="> ここに入力してください..." autocomplete="on">
+<input id="input" placeholder="> ここに入力してください... (URLで画像送信OK)" autocomplete="on">
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -172,6 +183,13 @@ function hideLoading() {
   terminalDiv.style.display = "flex";
 }
 
+// Função para escapar HTML (segurança básica)
+function escapeHTML(str) {
+  const p = document.createElement("p");
+  p.textContent = str;
+  return p.innerHTML;
+}
+
 // Login
 let username = localStorage.getItem("ct_username");
 let color = localStorage.getItem("ct_color");
@@ -201,14 +219,34 @@ db.ref("chattingterminalors/users").on("value", snap => {
   });
 });
 
-// Mensagens (limite baixo pra carregar rápido)
+// Mensagens com suporte a imagens por URL
 db.ref("chattingterminalors/messages")
-  .limitToLast(50)  // só as últimas 50 pra não carregar muito histórico
+  .limitToLast(100)
   .on("child_added", snap => {
     const m = snap.val();
     const line = document.createElement("div");
-    line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
-<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${escapeHTML(m.text)}`;
+    line.style.marginBottom = "4px";
+
+    let textContent = escapeHTML(m.text || "");
+
+    // Detecta URLs de imagem no texto
+    const imageRegex = /(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp))/gi;
+    const images = textContent.match(imageRegex) || [];
+
+    // Se tiver imagem, adiciona <img> abaixo do texto
+    if (images.length > 0) {
+      let imgHtml = "";
+      images.forEach(url => {
+        imgHtml += `<img src="${url}" class="chat-image" alt="Imagem enviada" onerror="this.style.display='none';">`;
+      });
+      textContent = textContent.replace(imageRegex, ''); // remove a URL do texto pra não duplicar
+      line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
+<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${textContent}${imgHtml}`;
+    } else {
+      line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
+<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${textContent}`;
+    }
+
     output.appendChild(line);
     output.scrollTop = output.scrollHeight;
   });
@@ -218,14 +256,6 @@ input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
 
-    if (val === "/clear") {
-      output.innerHTML = "チャッティングターミナルズ\n-------------------\nグローバルターミナルチャット\n/help でコマンド一覧\n";
-      input.value = "";
-      e.preventDefault();
-      return;
-    }
-
-    // Envio normal
     db.ref("chattingterminalors/messages").push({
       name: username,
       color: color,
@@ -235,26 +265,6 @@ input.addEventListener("keydown", e => {
     input.value = "";
   }
 });
-
-// FUNÇÃO PRINCIPAL: LIMPA O CHAT VISUAL TODA VEZ QUE CARREGA A PÁGINA (F5)
-window.addEventListener("load", () => {
-  setTimeout(() => {
-    // Limpa todo o conteúdo do output, mantendo só o texto inicial
-    output.innerHTML = `
-チャッティングターミナルズ
--------------------
-グローバルターミナルチャット
-/help でコマンド一覧
-    `;
-    botMsg("チャットがリロードされました。過去のメッセージはクリアされました。");
-  }, 1500); // delay pra esperar o loading acabar e os listeners iniciarem
-});
-
-function escapeHTML(str) {
-  const p = document.createElement("p");
-  p.textContent = str;
-  return p.innerHTML;
-}
 </script>
 </body>
 </html>
