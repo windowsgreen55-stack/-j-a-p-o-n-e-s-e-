@@ -1,311 +1,46 @@
 <!DOCTYPE html>
-<html lang="ja">
+<html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>チャッティングターミナルズ</title>
-<link rel="icon" type="image/x-icon" href="logo.ico?v=6">
-<meta property="og:title" content="チャッティングターミナルズ">
-<meta property="og:description" content="HTML・CSS・JavaScript と Firebase で作られたターミナルチャット。">
-<meta property="og:type" content="website">
-<meta name="theme-color" content="#000000">
-<style>
-@font-face{
-  font-family: Retro;
-  src: url("retro.ttf");
-}
-*{box-sizing:border-box;}
-body{
-  margin:0;
-  padding:0;
-  background:black;
-  color:#aaa;
-  font-family:Retro,monospace;
-  height:100vh;
-  width:100vw;
-  display:flex;
-  overflow:hidden;
-}
-#loading{
-  position:absolute;
-  top:0;
-  left:0;
-  width:100%;
-  height:100%;
-  background:black;
-  color:#00ff00;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  font-size:24px;
-  z-index:10000;
-}
-#users{
-  width:220px;
-  min-width:220px;
-  height:100%;
-  border-right:1px solid #333;
-  padding:10px;
-  overflow-y:auto;
-  background:#050505;
-  display:none;
-}
-#users h2{
-  font-size:14px;
-  color:#666;
-  margin-top:0;
-  border-bottom:1px solid #333;
-  padding-bottom:5px;
-}
-.user{
-  font-size:13px;
-  margin-bottom:5px;
-}
-#terminal{
-  flex:1;
-  position:relative;
-  height:100%;
-  background:black;
-  display:none;
-  flex-direction:column;
-}
-#output{
-  flex:1;
-  padding:15px;
-  padding-bottom:60px;
-  overflow-y:auto;
-  white-space:pre-wrap;
-  word-wrap:break-word;
-}
-#input{
-  position:absolute;
-  bottom:0;
-  left:0;
-  width:100%;
-  height:50px;
-  background:#111;
-  border:none;
-  border-top:2px solid #00ff00;
-  color:#00ff00;
-  padding:15px;
-  font-family:Retro,monospace;
-  font-size:16px;
-  outline:none;
-  z-index:9999;
-}
-.timestamp{
-  color:#555;
-  font-size:12px;
-  margin-right:8px;
-}
-.owner-tag{
-  color:#ff0000;
-  font-weight:bold;
-  margin-left:5px;
-  font-size:10px;
-}
-</style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>WebSite Closed</title>
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      height: 100%;
+      background: #000;
+      color: #ff0000;
+      font-family: monospace;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+    .container {
+      text-align: center;
+    }
+    h1 {
+      font-size: 120px;
+      margin: 0;
+      text-shadow: 0 0 30px #ff0000, 0 0 60px #ff0000;
+      animation: pulse 2s infinite;
+    }
+    p {
+      font-size: 36px;
+      margin: 20px 0 0;
+      opacity: 0.9;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.05); }
+    }
+  </style>
 </head>
 <body>
-<div id="loading">読み込み中... |</div>
-<div id="users">
-<h2>ユーザー</h2>
-<div id="userList"></div>
-</div>
-<div id="terminal">
-<div id="output">
-チャッティングターミナルズ
--------------------
-グローバルターミナルチャット
-/help でコマンド一覧
-</div>
-<input id="input" placeholder="> ここに入力してください..." autocomplete="on">
-</div>
-
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-<script>
-// Config Firebase
-const firebaseConfig = {
-  apiKey: "AIzaSyDwiyUVlDD3A7UCjPW2jcboauKuiq7GZc8",
-  authDomain: "dontsee-2694b.firebaseapp.com",
-  databaseURL: "https://dontsee-2694b-default-rtdb.firebaseio.com",
-  projectId: "dontsee-2694b",
-  storageBucket: "dontsee-2694b.firebasestorage.app",
-  messagingSenderId: "145706018915",
-  appId: "1:145706018915:web:2d54efa1e235966135f056"
-};
-
-if (!firebase.apps.length) {
-  firebase.initializeApp(firebaseConfig);
-}
-const db = firebase.database();
-
-// Elementos
-const output = document.getElementById("output");
-const input = document.getElementById("input");
-const userList = document.getElementById("userList");
-const loadingScreen = document.getElementById("loading");
-const usersDiv = document.getElementById("users");
-const terminalDiv = document.getElementById("terminal");
-
-// Sistema de BAN LOCAL (só pra ブライアン)
-const MY_NAME = "ブライアン";
-const STORAGE_KEY = "brian_banned_users";
-let banned = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-
-function botMsg(text) {
-  const line = document.createElement("div");
-  line.innerHTML = `<span class="timestamp">[${getTime()}]</span> <span style="color:#00ff00">System32</span>: ${text}`;
-  output.appendChild(line);
-  output.scrollTop = output.scrollHeight;
-}
-
-function getTime() {
-  const d = new Date();
-  return "[" + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0") + "]";
-}
-
-function randomColor() {
-  return `hsl(${Math.random()*360},70%,60%)`;
-}
-
-function escapeHTML(str) {
-  const p = document.createElement("p");
-  p.textContent = str;
-  return p.innerHTML;
-}
-
-function hideLoading() {
-  loadingScreen.style.display = "none";
-  usersDiv.style.display = "block";
-  terminalDiv.style.display = "flex";
-}
-
-// Login
-let username = localStorage.getItem("ct_username");
-let color = localStorage.getItem("ct_color");
-if (!username) {
-  username = prompt("ユーザー名を入力してください:");
-  if (!username) username = "guest" + Math.floor(Math.random()*1000);
-  color = randomColor();
-  localStorage.setItem("ct_username", username);
-  localStorage.setItem("ct_color", color);
-}
-
-const userRef = db.ref("chattingterminalors/users").push();
-userRef.set({name: username, color: color});
-userRef.onDisconnect().remove();
-
-// Usuários
-db.ref("chattingterminalors/users").on("value", snap => {
-  hideLoading();
-  userList.innerHTML = "";
-  snap.forEach(child => {
-    const u = child.val();
-    const div = document.createElement("div");
-    div.className = "user";
-    div.style.color = u.color;
-    div.textContent = u.name;
-    userList.appendChild(div);
-  });
-});
-
-// Mensagens
-db.ref("chattingterminalors/messages")
-  .limitToLast(100)
-  .on("child_added", snap => {
-    const m = snap.val();
-    const line = document.createElement("div");
-    line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
-<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${escapeHTML(m.text)}`;
-    output.appendChild(line);
-    output.scrollTop = output.scrollHeight;
-  });
-
-// Observer para deletar mensagens de banidos
-const banObserver = new MutationObserver(mutations => {
-  mutations.forEach(mutation => {
-    if (mutation.type === "childList" && mutation.addedNodes.length) {
-      mutation.addedNodes.forEach(node => {
-        if (node.nodeType === 1 && node.tagName === "DIV") {
-          const text = node.textContent || "";
-          for (const bannedUser of banned) {
-            if (text.includes(bannedUser + ":")) {
-              node.remove();
-              const banLine = document.createElement("div");
-              banLine.style.cssText = "margin:6px 0; padding:6px 12px; background:rgba(255,0,0,0.2); border-left:5px solid #ff0000; color:#ff4444;";
-              banLine.innerHTML = `<span class="timestamp">[${getTime()}]</span> <span style="color:#ff0000">BrianBanSystem</span>: BANIDO! あなたはここで話せません。`;
-              output.appendChild(banLine);
-              output.scrollTop = output.scrollHeight;
-              break;
-            }
-          }
-        }
-      });
-    }
-  });
-});
-banObserver.observe(output, { childList: true, subtree: true });
-
-// Input com comandos de ban
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter" && input.value.trim()) {
-    const val = input.value.trim();
-
-    // Só ativa se for ブライアン
-    if (username.trim() === "ブライアン") {
-      if (val.startsWith("/ban ")) {
-        const target = val.slice(5).trim();
-        if (target && !banned.includes(target)) {
-          banned.push(target);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-          botMsg(`ユーザー ${target} をローカルでBANしました (あなただけ見えます)`);
-        } else {
-          botMsg("すでにBAN済みか無効です");
-        }
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val.startsWith("/unban ")) {
-        const target = val.slice(7).trim();
-        banned = banned.filter(u => u !== target);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-        botMsg(`ユーザー ${target} をローカルで解除しました`);
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/banlist") {
-        botMsg("BANリスト (ローカル): " + (banned.length ? banned.join(", ") : "なし"));
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/unbanall") {
-        banned = [];
-        localStorage.setItem(STORAGE_KEY, "[]");
-        botMsg("すべてのローカルBANを解除しました");
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-    }
-
-    // Envio normal
-    db.ref("chattingterminalors/messages").push({
-      name: username,
-      color: color,
-      text: val,
-      time: Date.now()
-    });
-    input.value = "";
-  }
-});
-</script>
+  <div class="container">
+    <h1>WebSite Closed :/</h1>
+    <p>Nothing to see here anymore...</p>
+  </div>
 </body>
 </html>
