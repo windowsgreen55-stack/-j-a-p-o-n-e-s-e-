@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>チャッティングターミナルズ</title>
+<link rel="icon" type="image/x-icon" href="logo.ico?v=6">
+
+<meta property="og:title" content="チャッティングターミナルズ">
+<meta property="og:description" content="HTML・CSS・JavaScript と Firebase で作られたターミナルチャット。">
+<meta property="og:type" content="website">
+
+<meta name="theme-color" content="#000000">
+
+<style>
+@font-face{
+  font-family: Retro;
+  src: url("retro.ttf");
+}
+
+*{box-sizing:border-box;}
+
+body{
+  margin:0;
+  padding:0;
+  background:black;
+  color:#aaa;
+  font-family:Retro,monospace;
+  height:100vh;
+  width:100vw;
+  display:flex;
+  overflow:hidden;
+}
+
+#loading{
+  position:absolute;
+  top:0;
+  left:0;
+  width:100%;
+  height:100%;
+  background:black;
+  color:#00ff00;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  font-size:24px;
+  z-index:10000;
+}
+
+#users{
+  width:220px;
+  min-width:220px;
+  height:100%;
+  border-right:1px solid #333;
+  padding:10px;
+  overflow-y:auto;
+  background:#050505;
+  display:none;
+}
+
+#users h2{
+  font-size:14px;
+  color:#666;
+  margin-top:0;
+  border-bottom:1px solid #333;
+  padding-bottom:5px;
+}
+
+.user{
+  font-size:13px;
+  margin-bottom:5px;
+}
+
+#terminal{
+  flex:1;
+  position:relative;
+  height:100%;
+  background:black;
+  display:none;
+  flex-direction:column;
+}
+
+#output{
+  flex:1;
+  padding:15px;
+  padding-bottom:60px;
+  overflow-y:auto;
+  white-space:pre-wrap;
+  word-wrap:break-word;
+}
+
+#input{
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;
+  height:50px;
+  background:#111;
+  border:none;
+  border-top:2px solid #00ff00;
+  color:#00ff00;
+  padding:15px;
+  font-family:Retro,monospace;
+  font-size:16px;
+  outline:none;
+  z-index:9999;
+}
+
+.timestamp{
+  color:#555;
+  font-size:12px;
+  margin-right:8px;
+}
+
+.owner-tag{
+  color:#ff0000;
+  font-weight:bold;
+  margin-left:5px;
+  font-size:10px;
+}
+</style>
+</head>
+
+<body>
+
+<div id="loading">読み込み中... |</div>
+
+<div id="users">
+<h2>ユーザー</h2>
+<div id="userList"></div>
+</div>
+
+<div id="terminal">
+<div id="output">
+チャッティングターミナルズ
+-------------------
+グローバルターミナルチャット
+/help でコマンド一覧
+</div>
+
+<input id="input" placeholder="> ここに入力してください..." autocomplete="on">
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+apiKey: "AIzaSyDwiyUVlDD3A7UCjPW2jcboauKuiq7GZc8",
+authDomain: "dontsee-2694b.firebaseapp.com",
+databaseURL: "https://dontsee-2694b-default-rtdb.firebaseio.com",
+projectId: "dontsee-2694b",
+storageBucket: "dontsee-2694b.firebasestorage.app",
+messagingSenderId: "145706018915",
+appId: "1:145706018915:web:2d54efa1e235966135f056"
+};
+
+if (!firebase.apps.length) {
+firebase.initializeApp(firebaseConfig);
+}
+
+const db = firebase.database();
+
+const output = document.getElementById("output");
+const input = document.getElementById("input");
+const userList = document.getElementById("userList");
+const loadingScreen = document.getElementById("loading");
+const usersDiv = document.getElementById("users");
+const terminalDiv = document.getElementById("terminal");
+
+function randomColor(){
+return `hsl(${Math.random()*360},70%,60%)`;
+}
+
+function getTime(){
+const d=new Date();
+return "["+String(d.getHours()).padStart(2,"0")+":"+String(d.getMinutes()).padStart(2,"0")+"]";
+}
+
+function botMsg(text){
+const line=document.createElement("div");
+line.innerHTML=`<span class="timestamp">${getTime()}</span><span style="color:#00ff00">System32</span>: ${text}`;
+output.appendChild(line);
+output.scrollTop=output.scrollHeight;
+}
+
+function hideLoading(){
+loadingScreen.style.display="none";
+usersDiv.style.display="block";
+terminalDiv.style.display="flex";
+}
+
+let username=localStorage.getItem("ct_username");
+let color=localStorage.getItem("ct_color");
+
+if(!username){
+username=prompt("ユーザー名を入力してください:");
+if(!username) username="guest"+Math.floor(Math.random()*1000);
+color=randomColor();
+localStorage.setItem("ct_username",username);
+localStorage.setItem("ct_color",color);
+}
+
+const userRef=db.ref("chattingterminalors/users").push();
+userRef.set({name:username,color:color});
+userRef.onDisconnect().remove();
+
+db.ref("chattingterminalors/users").on("value",snap=>{
+
+hideLoading();
+userList.innerHTML="";
+
+snap.forEach(child=>{
+
+const u=child.val();
+const div=document.createElement("div");
+div.className="user";
+div.style.color=u.color;
+div.textContent=u.name;
+
+userList.appendChild(div);
+
+});
+
+});
+
+db.ref("chattingterminalors/messages")
+.limitToLast(100)
+.on("child_added",snap=>{
+
+const m=snap.val();
+
+const line=document.createElement("div");
+
+line.innerHTML=`<span class="timestamp">${getTime()}</span>
+<span style="color:${m.color}">${m.name}</span>: ${m.text}`;
+
+output.appendChild(line);
+output.scrollTop=output.scrollHeight;
+
+});
+
+input.addEventListener("keydown",e=>{
+
+if(e.key==="Enter" && input.value.trim()){
+
+const val=input.value.trim();
+
+if(val==="/help"){
+botMsg("/help コマンド一覧<br>/color 色変更<br>/name 名前変更<br>/clear チャットクリア");
+}
+
+else if(val==="/clear"){
+output.innerHTML="";
+}
+
+else if(val.startsWith("/color ")){
+color=val.split(" ")[1];
+localStorage.setItem("ct_color",color);
+userRef.update({color:color});
+botMsg("色を変更しました");
+}
+
+else if(val.startsWith("/name ")){
+username=val.split(" ").slice(1).join(" ");
+localStorage.setItem("ct_username",username);
+userRef.update({name:username});
+botMsg("名前を変更しました");
+}
+
+else{
+
+db.ref("chattingterminalors/messages").push({
+name:username,
+color:color,
+text:val,
+time:Date.now()
+});
+
+}
+
+input.value="";
+
+}
+
+});
+</script>
+
+</body>
+</html>
