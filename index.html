@@ -104,7 +104,6 @@ body{
   margin-left:5px;
   font-size:10px;
 }
-/* Rainbow animation - agora funciona no nome */
 .rainbow-name {
   animation: rainbow 3s linear infinite;
   font-weight: bold;
@@ -117,14 +116,27 @@ body{
   75% { color: #00ffff; }
   100% { color: #ff0000; }
 }
-/* Estilo pra imagens */
-.chat-image {
+/* Estilo pra imagens e vídeos (incluindo Shorts) */
+.chat-image, .chat-video-wrapper {
   max-width: 380px;
-  max-height: 300px;
   margin-top: 8px;
   border: 2px solid #00ff00;
   border-radius: 4px;
   display: block;
+}
+.chat-video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 */
+  height: 0;
+  overflow: hidden;
+}
+.chat-video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 </style>
 </head>
@@ -141,9 +153,9 @@ body{
 グローバルターミナルチャット
 /help でコマンド一覧
 
-(画像を送るにはURLを貼ってください。例: https://i.imgur.com/exemplo.png)
+(画像やYouTube Shortsを送るにはURLを貼ってください。例: https://www.youtube.com/shorts/Vy7qJL1RF2Y)
 </div>
-<input id="input" placeholder="> ここに入力してください... (URLで画像OK)" autocomplete="on">
+<input id="input" placeholder="> ここに入力してください... (URLで画像/Shorts OK)" autocomplete="on">
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -225,18 +237,14 @@ db.ref("chattingterminalors/users").on("value", snap => {
     const u = child.val();
     const div = document.createElement("div");
     div.className = "user";
-    if (u.color === "rainbow") {
-      div.classList.add("rainbow-name");
-      div.textContent = u.name;
-    } else {
-      div.style.color = u.color || "#aaa";
-      div.textContent = u.name;
-    }
+    if (u.color === "rainbow") div.classList.add("rainbow-name");
+    else div.style.color = u.color || "#aaa";
+    div.textContent = u.name;
     userList.appendChild(div);
   });
 });
 
-// Mensagens com imagens
+// Mensagens com imagens e YouTube Shorts
 db.ref("chattingterminalors/messages")
   .limitToLast(100)
   .on("child_added", snap => {
@@ -246,32 +254,54 @@ db.ref("chattingterminalors/messages")
 
     let textContent = escapeHTML(m.text || "");
 
+    // Detecta imagens
     const imageRegex = /(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp))/gi;
     const images = textContent.match(imageRegex) || [];
 
-    let imgHtml = "";
+    // Detecta YouTube Shorts
+    const shortsRegex = /(https?:\/\/(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]+))/gi;
+    const shorts = textContent.match(shortsRegex) || [];
+
+    let mediaHtml = "";
+
+    // Imagens
     if (images.length > 0) {
       images.forEach(url => {
-        imgHtml += `<img src="${url}" class="chat-image" alt="Imagem" onerror="this.style.display='none';">`;
+        mediaHtml += `<img src="${url}" class="chat-image" alt="Imagem" onerror="this.style.display='none';">`;
       });
       textContent = textContent.replace(imageRegex, '');
+    }
+
+    // YouTube Shorts
+    if (shorts.length > 0) {
+      shorts.forEach(url => {
+        const videoId = url.split('/shorts/')[1].split('?')[0];
+        mediaHtml += `
+          <div class="chat-video-wrapper">
+            <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1&showinfo=0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen></iframe>
+          </div>`;
+      });
+      textContent = textContent.replace(shortsRegex, '');
     }
 
     let nameTag = (m.color === "rainbow") 
       ? `<span class="rainbow-name">${escapeHTML(m.name)}</span>`
       : `<span style="color:${m.color}">${escapeHTML(m.name)}</span>`;
 
-    line.innerHTML = `<span class="timestamp">[${getTime()}]</span> ${nameTag}: ${textContent}${imgHtml}`;
+    line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
+${nameTag}: ${textContent}${mediaHtml}`;
     output.appendChild(line);
     output.scrollTop = output.scrollHeight;
   });
 
-// Input com comandos (/color rainbow e /name corrigidos)
+// Input com comandos (/name e /color corrigidos)
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
 
-    // /color
+    // /color (com rainbow funcionando)
     if (val.startsWith("/color ")) {
       const newColor = val.slice(7).trim();
       if (!newColor) {
@@ -344,7 +374,7 @@ input.addEventListener("keydown", e => {
       return;
     }
 
-    // Envio normal
+    // Envio normal (inclui imagens e Shorts por URL)
     db.ref("chattingterminalors/messages").push({
       name: username,
       color: color,
