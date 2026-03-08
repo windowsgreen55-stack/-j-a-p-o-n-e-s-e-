@@ -104,25 +104,29 @@ body{
   margin-left:5px;
   font-size:10px;
 }
-/* Estilo pra imagens enviadas por URL */
-.chat-image {
+/* Estilo pra imagens e vídeos */
+.chat-image, .chat-video {
   max-width: 380px;
-  max-height: 300px;
   margin-top: 8px;
   border: 2px solid #00ff00;
   border-radius: 4px;
   display: block;
 }
-.rainbow-name {
-  animation: rainbow 3s linear infinite;
-  font-weight: bold;
+.chat-video-wrapper {
+  position: relative;
+  padding-bottom: 56.25%; /* 16:9 aspect ratio */
+  height: 0;
+  overflow: hidden;
+  margin-top: 8px;
+  max-width: 380px;
 }
-@keyframes rainbow {
-  0% { color: #ff0000; }
-  25% { color: #ffff00; }
-  50% { color: #00ff00; }
-  75% { color: #00ffff; }
-  100% { color: #ff0000; }
+.chat-video-wrapper iframe {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  border: none;
 }
 </style>
 </head>
@@ -139,9 +143,9 @@ body{
 グローバルターミナルチャット
 /help でコマンド一覧
 
-(画像を送るにはURLを貼ってください。例: https://i.imgur.com/exemplo.png)
+(画像やYouTube Shortsを送るにはURLを貼ってください。例: https://www.youtube.com/shorts/Vy7qJL1RF2Y)
 </div>
-<input id="input" placeholder="> ここに入力してください... (URLで画像OK)" autocomplete="on">
+<input id="input" placeholder="> ここに入力してください... (URLで画像/Shorts OK)" autocomplete="on">
 </div>
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -170,11 +174,6 @@ const userList = document.getElementById("userList");
 const loadingScreen = document.getElementById("loading");
 const usersDiv = document.getElementById("users");
 const terminalDiv = document.getElementById("terminal");
-
-// Sistema de BAN LOCAL (só pra ブライアン)
-const MY_NAME = "ブライアン";
-const STORAGE_KEY = "brian_banned_users";
-let banned = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
 
 // Funções básicas
 function randomColor() {
@@ -234,7 +233,7 @@ db.ref("chattingterminalors/users").on("value", snap => {
   });
 });
 
-// Mensagens com suporte a imagens por URL
+// Mensagens com suporte a imagens e YouTube Shorts
 db.ref("chattingterminalors/messages")
   .limitToLast(100)
   .on("child_added", snap => {
@@ -244,147 +243,49 @@ db.ref("chattingterminalors/messages")
 
     let textContent = escapeHTML(m.text || "");
 
-    // Detecta URLs de imagem
+    // Detecta imagens
     const imageRegex = /(https?:\/\/[^\s]+\.(png|jpg|jpeg|gif|webp))/gi;
     const images = textContent.match(imageRegex) || [];
 
-    let imgHtml = "";
+    // Detecta YouTube Shorts
+    const shortsRegex = /(https?:\/\/(?:www\.)?youtube\.com\/shorts\/([a-zA-Z0-9_-]+))/gi;
+    const shorts = textContent.match(shortsRegex) || [];
+
+    let mediaHtml = "";
+
+    // Imagens
     if (images.length > 0) {
       images.forEach(url => {
-        imgHtml += `<img src="${url}" class="chat-image" alt="Imagem" onerror="this.style.display='none';">`;
+        mediaHtml += `<img src="${url}" class="chat-image" alt="Imagem enviada" onerror="this.style.display='none';">`;
       });
-      textContent = textContent.replace(imageRegex, ''); // remove URL do texto
+      textContent = textContent.replace(imageRegex, '');
+    }
+
+    // YouTube Shorts
+    if (shorts.length > 0) {
+      shorts.forEach(url => {
+        const videoId = url.split('/shorts/')[1].split('?')[0];
+        mediaHtml += `
+          <div class="chat-video-wrapper">
+            <iframe src="https://www.youtube.com/embed/${videoId}?rel=0&modestbranding=1" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen></iframe>
+          </div>`;
+      });
+      textContent = textContent.replace(shortsRegex, '');
     }
 
     line.innerHTML = `<span class="timestamp">[${getTime()}]</span> 
-<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${textContent}${imgHtml}`;
+<span style="color:${m.color}">${escapeHTML(m.name)}</span>: ${textContent}${mediaHtml}`;
     output.appendChild(line);
     output.scrollTop = output.scrollHeight;
   });
 
-// Input com comandos (incluindo /name e /color corrigidos)
+// Input
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
 
-    // Sistema de BAN (só pra ブライアン)
-    if (username.trim() === MY_NAME) {
-      if (val.startsWith("/ban ")) {
-        let target = val.slice(5).trim().toLowerCase();
-        if (target && !banned.includes(target)) {
-          banned.push(target);
-          localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-          botMsg(`BAN LOCAL: ${target} banido (só você vê)`);
-        } else {
-          botMsg("Já banido ou inválido.");
-        }
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val.startsWith("/unban ")) {
-        let target = val.slice(7).trim().toLowerCase();
-        banned = banned.filter(u => u !== target);
-        localStorage.setItem(STORAGE_KEY, JSON.stringify(banned));
-        botMsg(`UNBAN LOCAL: ${target} liberado`);
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/banlist") {
-        botMsg("BAN LIST (local): " + (banned.length ? banned.join(", ") : "vazio"));
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (val === "/unbanall") {
-        banned = [];
-        localStorage.setItem(STORAGE_KEY, "[]");
-        botMsg("Todos bans locais removidos.");
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-    }
-
-    // Comando /color (corrigido)
-    if (val.startsWith("/color ")) {
-      const newColor = val.slice(7).trim();
-      if (!newColor) {
-        botMsg("Cor inválida.");
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      if (newColor.toLowerCase() === "rainbow") {
-        color = "rainbow";
-        localStorage.setItem("ct_color", color);
-        userRef.update({ color: "rainbow" }).then(() => {
-          botMsg("Sua cor foi mudada para rainbow!");
-        }).catch(err => {
-          botMsg("Erro ao mudar cor (permissão negada?).");
-          console.error(err);
-        });
-      } else {
-        // Valida hex simples (#rrggbb ou #rgb)
-        const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-        if (hexRegex.test(newColor)) {
-          color = newColor;
-          localStorage.setItem("ct_color", color);
-          userRef.update({ color: color }).then(() => {
-            botMsg("Sua cor foi mudada para " + newColor + ".");
-          }).catch(err => {
-            botMsg("Erro ao mudar cor (permissão negada?).");
-            console.error(err);
-          });
-        } else {
-          botMsg("Cor inválida. Use #RRGGBB ou 'rainbow'.");
-        }
-      }
-      input.value = "";
-      e.preventDefault();
-      return;
-    }
-
-    // Comando /name (já corrigido antes)
-    if (val.startsWith("/name ")) {
-      const newName = val.slice(6).trim();
-      if (!newName || newName.includes("/")) {
-        botMsg("Nome inválido.");
-        input.value = "";
-        e.preventDefault();
-        return;
-      }
-
-      db.ref("chattingterminalors/users").once("value", snap => {
-        let taken = false;
-        snap.forEach(child => {
-          if (child.val().name?.toLowerCase() === newName.toLowerCase()) taken = true;
-        });
-
-        if (taken) {
-          botMsg("Esse nome já está em uso.");
-        } else {
-          username = newName;
-          localStorage.setItem("ct_username", username);
-          userRef.update({ name: username }).then(() => {
-            botMsg("Seu nome foi mudado para " + newName + ".");
-          }).catch(err => {
-            botMsg("Erro ao mudar nome (verifique permissão).");
-            console.error(err);
-          });
-        }
-      });
-      input.value = "";
-      e.preventDefault();
-      return;
-    }
-
-    // Envio normal (inclui imagens por URL)
     db.ref("chattingterminalors/messages").push({
       name: username,
       color: color,
