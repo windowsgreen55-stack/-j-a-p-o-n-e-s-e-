@@ -116,7 +116,7 @@ body{
   75% { color: #00ffff; }
   100% { color: #ff0000; }
 }
-/* Estilo pra imagens e vídeos (incluindo Shorts) */
+/* Estilo pra imagens e vídeos (Shorts) */
 .chat-image, .chat-video-wrapper {
   max-width: 380px;
   margin-top: 8px;
@@ -244,6 +244,10 @@ db.ref("chattingterminalors/users").on("value", snap => {
   });
 });
 
+// Bot AgentBot [a!] - cor laranja
+const BOT_NAME = "AgentBot [a!]";
+const BOT_COLOR = "#ff8800"; // laranja
+
 // Mensagens com imagens e YouTube Shorts
 db.ref("chattingterminalors/messages")
   .limitToLast(100)
@@ -296,12 +300,71 @@ ${nameTag}: ${textContent}${mediaHtml}`;
     output.scrollTop = output.scrollHeight;
   });
 
-// Input com comandos (/name e /color corrigidos)
+// Input com comandos (incluindo /name, /color e bot AgentBot)
 input.addEventListener("keydown", e => {
   if (e.key === "Enter" && input.value.trim()) {
     const val = input.value.trim();
 
-    // /color (com rainbow funcionando)
+    // Bot AgentBot responde a comandos
+    if (val.startsWith("/")) {
+      const cmd = val.toLowerCase();
+
+      if (cmd === "/help") {
+        botMsg("AgentBot [a!] コマンド一覧:<br>/help - このメッセージ<br>/translate [texto] - 翻訳 (日本語→英語)<br>/ping - ポン！<br>/funfact - 面白い事実<br>/whoisownerofctjp - CTJPのオーナー情報<br>/botinfo - Bot情報");
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (cmd.startsWith("/translate ")) {
+        const texto = val.slice(11).trim();
+        if (texto) {
+          botMsg("翻訳中... (AgentBot): " + texto + " → " + "Translation: " + texto); // placeholder - pode integrar API depois
+        } else {
+          botMsg("翻訳するテキストを入力してください");
+        }
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (cmd === "/ping") {
+        botMsg("Pong! AgentBot [a!] online!");
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (cmd === "/funfact") {
+        const facts = [
+          "地球上で最も長い川はナイル川です。",
+          "ハチは数学が得意です。",
+          "カンガルーは後ろに歩けません。",
+          "タコには3つの心臓があります。",
+          "宇宙は無限に広がっていますが、実は有限かも？"
+        ];
+        botMsg("Fun Fact: " + facts[Math.floor(Math.random() * facts.length)]);
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (cmd === "/whoisownerofctjp") {
+        botMsg("CTJPのオーナーは... 秘密です！😏 (AgentXboxが関わってるらしいよ)");
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+
+      if (cmd === "/botinfo") {
+        botMsg("AgentBot [a!] v1.0<br>作成: あなたの友達<br>色: オレンジ (#ff8800)<br>コマンド: /help で確認");
+        input.value = "";
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // /color (com rainbow)
     if (val.startsWith("/color ")) {
       const newColor = val.slice(7).trim();
       if (!newColor) {
@@ -374,7 +437,7 @@ input.addEventListener("keydown", e => {
       return;
     }
 
-    // Envio normal (inclui imagens e Shorts por URL)
+    // Envio normal (inclui imagens e Shorts)
     db.ref("chattingterminalors/messages").push({
       name: username,
       color: color,
